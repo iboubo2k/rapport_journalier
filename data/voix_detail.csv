@@ -1,0 +1,49 @@
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+data_dir = Path("/content/rapport_journalier/data")
+data_dir.mkdir(parents=True, exist_ok=True)
+
+rng = np.random.default_rng(42)
+dates = pd.date_range("2025-04-01", "2026-03-31", freq="D")
+
+def gen(base, noise=0.06, trend=0.0005):
+    out = []
+    for i, d in enumerate(dates):
+        weekly = 1 + 0.05 * np.sin((2 * np.pi * d.dayofweek) / 7)
+        monthly = 1 + 0.04 * np.sin((2 * np.pi * d.day) / 30)
+        growth = 1 + trend * i
+        rand = 1 + rng.normal(0, noise)
+        out.append(max(base * weekly * monthly * growth * rand, 0))
+    return np.round(out, 2)
+
+voix_detail = pd.DataFrame({
+    "Periode": dates.strftime("%Y-%m-%d"),
+    "Voix_TTC": gen(135_000_000, 0.05),
+    "SMS_TTC": gen(2_300_000, 0.08),
+    "Djiguiya_Voix_SMS_TTC": gen(13_000_000, 0.06),
+    "Sewa_TTC": gen(118_000_000, 0.06),
+    "Netaa_Voix_TTC": gen(160_000_000, 0.05),
+    "Forfaits_Voix_Inter_TTC": gen(1_500_000, 0.09),
+    "PAYG_National_TTC": gen(112_000_000, 0.05),
+})
+
+component_cols = [
+    "Voix_TTC",
+    "SMS_TTC",
+    "Djiguiya_Voix_SMS_TTC",
+    "Sewa_TTC",
+    "Netaa_Voix_TTC",
+    "Forfaits_Voix_Inter_TTC",
+    "PAYG_National_TTC",
+]
+
+voix_detail["Voix_SMS_Total_TTC"] = voix_detail[component_cols].sum(axis=1)
+voix_detail["Voix_SMS_Total_HT"] = np.round(voix_detail["Voix_SMS_Total_TTC"] / 1.18, 2)
+
+voix_detail.to_csv(data_dir / "voix_detail.csv", index=False)
+
+print("✅ Fichier créé :", data_dir / "voix_detail.csv")
+print("Nb de lignes :", len(voix_detail))
+print(voix_detail.head())
